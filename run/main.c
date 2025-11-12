@@ -37,12 +37,15 @@ void run_init(void) { // more init-actions?
 void set_vga(int b) {  // two buffers for smooth transitions?
   volatile int* vga_address = (volatile int*) 0x04000100; // VGA adress
   volatile int* buffer0 = (volatile int*) 0x08000000;
-  volatile int* buffer1 = (volatile int*) 0x08000000 + 76800; // works maybe
+  volatile int* buffer1 = (volatile int*) 0x08000000 + (0x257ff / 8); // works maybe
   
   //print("\nControl: ");
   //print_dec((int) *(vga_address+3));
   //*(vga_address+12) = 4; // enable DMA controller ?
-  *(buffer0+3) = 0x16; // TEST: set buffer0 to whatever
+  *(buffer0+3) = 0xff; // TEST: set buffer0 to whatever
+  for (int i = 0; i<20; i++) {
+    *(buffer1+i) = 0xff;
+  }
   print("\nbefore: ");
   print_dec((int) *(vga_address+0));
   if (b) {
