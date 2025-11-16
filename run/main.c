@@ -44,10 +44,8 @@ void set_vga(int b) {  // two buffers for smooth transitions?
   //*(vga_address+12) = 4; // enable DMA controller ?
   *(buffer0+3) = 0xff; // TEST: set buffer0 to whatever
   for (int i = 0; i<20; i++) {
-    *(buffer1+i) = 0xff;
+    *(buffer1+i) = 0xffffffff;
   }
-  print("\nbefore: ");
-  print_dec((int) *(vga_address+0));
   if (b) {
     print("\n 0");
     *(vga_address+1) = (int) buffer0; // set BackBuffer = buffer0
@@ -55,9 +53,7 @@ void set_vga(int b) {  // two buffers for smooth transitions?
     print("\n 1");
     *(vga_address+1) = (int) buffer1;
   }
-  *(vga_address) = 1; // swap
-  print("\nafter: ");
-  print_dec((int) *(vga_address+0));
+  *(vga_address) = 1; // swap buffer
 }
 
 void handle_interrupt(unsigned cause) {
