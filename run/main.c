@@ -6,8 +6,9 @@ extern void print_dec(unsigned int);
 extern void game_loop();
 
 // declare global variables
-int SCREEN_HEIGHT = 320;
-int SCREEN_WIDTH = 240;
+static int SCREEN_WIDTH = 320;
+static int SCREEN_HEIGHT = 240;
+static int BAR_HEIGHT = 20;
 
 void enable_interrupt() {
     /*
@@ -36,6 +37,21 @@ void run_init(void) { // more init-actions?
   *(timer_address+1) = 0x7; // set ITO=1, CONT=1, START=1 in control register
 }
 
+int decode_color(int c) {
+  /*
+  0 --> white
+  1 --> blue
+  2 --> green
+  3 --> red
+  */
+  int colors[] = {0xff, 0x2, 0x10, 0x80};
+  return colors[c];
+}
+
+void make_bar() {
+
+}
+
 void set_vga() {  // two buffers for smooth transitions between frames
   static int active_buffer = 0; // initialize buffer tracker
   volatile int* vga_address = (volatile int*) 0x04000100; // VGA adress
@@ -44,9 +60,18 @@ void set_vga() {  // two buffers for smooth transitions between frames
   
   // determine what to draw to next frame
   *(buffer0+160+(320*120)) = 0xff;
-  for (int i = 0; i<320; i++) {
-    *(buffer1+i) = 0x1a;
+
+  int test[] = {0,1,2,3,0};
+  // NOTE: put this inside the buffer choice code below later
+  int screen_middle = (SCREEN_WIDTH*(SCREEN_HEIGHT/2 -BAR_HEIGHT/2));
+  for (int j = 0; j<BAR_HEIGHT; j++) {
+    for (int i = 0; i<SCREEN_WIDTH; i++) {
+      int color_index = ((i*(sizeof(test)/4))/SCREEN_WIDTH);
+      if (i%10 == 0) print_dec(color_index);
+      *(buffer1+screen_middle+(SCREEN_WIDTH*j)+i) = decode_color(test[color_index]);
+    }
   }
+  
 
   // determine which buffer to use
   if (active_buffer) {
