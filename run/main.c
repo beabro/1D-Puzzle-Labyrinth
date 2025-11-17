@@ -4,12 +4,16 @@
 extern void print(const char*);
 extern void print_dec(unsigned int);
 extern void game_loop();
+extern int* get_colors();
+extern void add_frame_time();
 
-// declare global variables
-static int SCREEN_WIDTH = 320;
-static int SCREEN_HEIGHT = 240;
-static int BAR_HEIGHT = 20;
-static int FPS = 2;
+// declare global constants
+const int SCREEN_WIDTH = 320;
+const int SCREEN_HEIGHT = 240;
+const int BAR_HEIGHT = 20;
+const int FPS = 2;
+
+//int frame_time = 0;
 
 void enable_interrupt() {
     /*
@@ -46,7 +50,7 @@ int decode_color(int c) {
   3 --> red
   */
   int colors[] = {0xff, 0x2, 0x10, 0x80};
-  if (c > sizeof(colors)/4) return 0;
+  if (c > sizeof(colors)/sizeof(colors[0])) return 0;
   return colors[c];
 }
 
@@ -60,7 +64,7 @@ void make_bar(volatile char* buffer, int colors[], int resolution) {
   }
 }
 
-void set_vga(int colors[], int resolution) {  // two buffers for smooth transitions between frames
+void set_vga(int colors[], int res) {  // two buffers for smooth transitions between frames
   static int active_buffer = 0; // initialize buffer tracker
   volatile int* vga_address = (volatile int*) 0x04000100; // VGA adress
   volatile char* buffer0 = (volatile char*) 0x08000000;
@@ -71,15 +75,15 @@ void set_vga(int colors[], int resolution) {  // two buffers for smooth transiti
 
   // determine which buffer to use
   if (active_buffer) { // edit buffer0
-    make_bar(buffer0,colors,resolution);
+    make_bar(buffer0,colors,res);
     *(vga_address+1) = (int) buffer0; // set BackBuffer = buffer0
   } else {             // edit buffer1
-    make_bar(buffer1,colors,resolution);
+    make_bar(buffer1,colors,res);
     *(vga_address+1) = (int) buffer1;
   }
   *(vga_address) = 1; // swap active_buffer
   active_buffer = !active_buffer; // track the swap
-  //print_dec(active_buffer);
+  //print_dec(active_buffer); // TEST to track frame changes
 }
 
 void handle_interrupt(unsigned cause) {
@@ -94,12 +98,11 @@ void handle_interrupt(unsigned cause) {
             timeoutcount++;
             if (timeoutcount==10) { // activate every 0.1*10 s
                 timeoutcount=0;
-                //print("\nBUFFER: ");
-                //print_dec(active_buffer);
+                add_frame_time();
                 
                 //game_loop();
-                int test[] = {0,1,2,3,0,0};
-                set_vga(test,sizeof(test)/4);
+                //int colors[] = get_colors();
+                //set_vga(colors,sizeof(colors)/sizeof(colors[0]));
             }
             break;
         default:
@@ -110,9 +113,12 @@ void handle_interrupt(unsigned cause) {
 int main(void) {
     print("start!");
     run_init();
-    //set_vga();
     
-    while(1){
-
+    while (1) {
+      game_loop();
     }
 }
+
+
+
+/* ---------------------------------------------------  */
