@@ -3,9 +3,11 @@
 //extern void enable_interrupt(void);
 extern void print(const char*);
 extern void print_dec(unsigned int);
+extern void game_loop();
 
-int timeoutcount = 0;
-int active_buffer = 0;
+// declare global variables
+int SCREEN_HEIGHT = 320;
+int SCREEN_WIDTH = 240;
 
 void enable_interrupt() {
     /*
@@ -34,29 +36,32 @@ void run_init(void) { // more init-actions?
   *(timer_address+1) = 0x7; // set ITO=1, CONT=1, START=1 in control register
 }
 
-void set_vga(int b) {  // two buffers for smooth transitions?
+void set_vga() {  // two buffers for smooth transitions between frames
+  static int active_buffer = 0; // initialize buffer tracker
   volatile int* vga_address = (volatile int*) 0x04000100; // VGA adress
-  volatile int* buffer0 = (volatile int*) 0x08000000;
-  volatile int* buffer1 = (volatile int*) 0x08000000 + (0x257ff / 8); // works maybe
+  volatile char* buffer0 = (volatile char*) 0x08000000;
+  volatile char* buffer1 = (volatile char*) 0x08000000 + (0x257ff / 2); // works maybe
   
-  //print("\nControl: ");
-  //print_dec((int) *(vga_address+3));
-  //*(vga_address+12) = 4; // enable DMA controller ?
-  *(buffer0+3) = 0xff; // TEST: set buffer0 to whatever
-  for (int i = 0; i<20; i++) {
-    *(buffer1+i) = 0xffffffff;
+  // determine what to draw to next frame
+  *(buffer0+160+(320*120)) = 0xff;
+  for (int i = 0; i<320; i++) {
+    *(buffer1+i) = 0x1a;
   }
-  if (b) {
-    print("\n 0");
+
+  // determine which buffer to use
+  if (active_buffer) {
+    //print("\n 0");
     *(vga_address+1) = (int) buffer0; // set BackBuffer = buffer0
   } else {
-    print("\n 1");
+    //print("\n 1");
     *(vga_address+1) = (int) buffer1;
   }
-  *(vga_address) = 1; // swap buffer
+  *(vga_address) = 1; // swap active_buffer
+  active_buffer = !active_buffer; // track the swap
 }
 
 void handle_interrupt(unsigned cause) {
+    static int timeoutcount = 0; // initialize the timeout counter
     volatile int* timer_address = (volatile int*) 0x04000020;
     //volatile int* switch_address = (volatile int*) 0x04000010;
     //volatile int* button_address = (volatile int*) TODO;
@@ -70,9 +75,8 @@ void handle_interrupt(unsigned cause) {
                 //print("\nBUFFER: ");
                 //print_dec(active_buffer);
                 
-                set_vga(active_buffer);
-
-                active_buffer = !active_buffer; // switch active buffer
+                //game_loop();
+                set_vga();
             }
             break;
         default:
