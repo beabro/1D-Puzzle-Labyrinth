@@ -9,6 +9,7 @@ extern void game_loop();
 static int SCREEN_WIDTH = 320;
 static int SCREEN_HEIGHT = 240;
 static int BAR_HEIGHT = 20;
+static int FPS = 2;
 
 void enable_interrupt() {
     /*
@@ -25,7 +26,7 @@ void run_init(void) { // more init-actions?
   enable_interrupt();
   // prepare timer
   volatile int* timer_address = (volatile int*) 0x04000020; // to 0x0400003F
-  int TO_period = 3000000-1; // 0.1s for 30MHz clock
+  int TO_period = (3000000-1)/FPS; // 0.1s for 30MHz clock
   *(timer_address+2) = TO_period & 0xffff; // 16 lsb in first TO register
   *(timer_address+3) = TO_period>>16; // 16 msb in second TO register
 
@@ -45,44 +46,40 @@ int decode_color(int c) {
   3 --> red
   */
   int colors[] = {0xff, 0x2, 0x10, 0x80};
+  if (c > sizeof(colors)/4) return 0;
   return colors[c];
 }
 
-void make_bar() {
-
+void make_bar(volatile char* buffer, int colors[], int resolution) {
+  int screen_middle = (SCREEN_WIDTH*(SCREEN_HEIGHT/2 -BAR_HEIGHT/2));
+  for (int j = 0; j<BAR_HEIGHT; j++) {
+    for (int i = 0; i<SCREEN_WIDTH; i++) {
+      int color_index = ((i*resolution)/SCREEN_WIDTH);
+      *(buffer+screen_middle+(SCREEN_WIDTH*j)+i) = decode_color(colors[color_index]);
+    }
+  }
 }
 
-void set_vga() {  // two buffers for smooth transitions between frames
+void set_vga(int colors[], int resolution) {  // two buffers for smooth transitions between frames
   static int active_buffer = 0; // initialize buffer tracker
   volatile int* vga_address = (volatile int*) 0x04000100; // VGA adress
   volatile char* buffer0 = (volatile char*) 0x08000000;
   volatile char* buffer1 = (volatile char*) 0x08000000 + (0x257ff / 2); // works maybe
   
-  // determine what to draw to next frame
-  *(buffer0+160+(320*120)) = 0xff;
-
-  int test[] = {0,1,2,3,0};
-  // NOTE: put this inside the buffer choice code below later
-  int screen_middle = (SCREEN_WIDTH*(SCREEN_HEIGHT/2 -BAR_HEIGHT/2));
-  for (int j = 0; j<BAR_HEIGHT; j++) {
-    for (int i = 0; i<SCREEN_WIDTH; i++) {
-      int color_index = ((i*(sizeof(test)/4))/SCREEN_WIDTH);
-      if (i%10 == 0) print_dec(color_index);
-      *(buffer1+screen_middle+(SCREEN_WIDTH*j)+i) = decode_color(test[color_index]);
-    }
-  }
-  
+  // TEST, see only one buffer
+  //*(buffer0+160+(320*120)) = 0xff;
 
   // determine which buffer to use
-  if (active_buffer) {
-    //print("\n 0");
+  if (active_buffer) { // edit buffer0
+    make_bar(buffer0,colors,resolution);
     *(vga_address+1) = (int) buffer0; // set BackBuffer = buffer0
-  } else {
-    //print("\n 1");
+  } else {             // edit buffer1
+    make_bar(buffer1,colors,resolution);
     *(vga_address+1) = (int) buffer1;
   }
   *(vga_address) = 1; // swap active_buffer
   active_buffer = !active_buffer; // track the swap
+  //print_dec(active_buffer);
 }
 
 void handle_interrupt(unsigned cause) {
@@ -101,7 +98,8 @@ void handle_interrupt(unsigned cause) {
                 //print_dec(active_buffer);
                 
                 //game_loop();
-                set_vga();
+                int test[] = {0,1,2,3,0,0};
+                set_vga(test,sizeof(test)/4);
             }
             break;
         default:
