@@ -1,4 +1,5 @@
 //#include <stdio.h>
+//#include <math.h>
 
 //extern void enable_interrupt(void);
 extern void print(const char*);
@@ -69,9 +70,6 @@ void set_vga(int colors[], int res) {  // two buffers for smooth transitions bet
   volatile int* vga_address = (volatile int*) 0x04000100; // VGA adress
   volatile char* buffer0 = (volatile char*) 0x08000000;
   volatile char* buffer1 = (volatile char*) 0x08000000 + (0x257ff / 2); // works maybe
-  
-  // TEST, see only one buffer
-  //*(buffer0+160+(320*120)) = 0xff;
 
   // determine which buffer to use
   if (active_buffer) { // edit buffer0
@@ -99,10 +97,6 @@ void handle_interrupt(unsigned cause) {
             if (timeoutcount==10) { // activate every 0.1*10 s
                 timeoutcount=0;
                 add_frame_time();
-                
-                //game_loop();
-                //int colors[] = get_colors();
-                //set_vga(colors,sizeof(colors)/sizeof(colors[0]));
             }
             break;
         default:
