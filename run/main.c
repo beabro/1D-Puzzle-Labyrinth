@@ -12,7 +12,7 @@ extern void add_frame_time();
 const int SCREEN_WIDTH = 320;
 const int SCREEN_HEIGHT = 240;
 const int BAR_HEIGHT = 20;
-const int FPS = 2;
+const int FPS = 30;
 
 //int frame_time = 0;
 
