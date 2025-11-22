@@ -9,10 +9,10 @@ extern int decode_color(int c);
 
 // constants ?
 #define PI 3.14159265
-#define RESOLUTION 500
+#define RESOLUTION 50  // < 320 because of lack of pixels
 int MAP_WIDTH = 1000;
 int MAP_HEIGHT = 1000;
-int step_length = 10;
+int step_length = 5;
 double turn_length = PI/6;
 
 // variables
@@ -40,7 +40,7 @@ int get_mv() {  // check if movement switches are active
 
 void add_frame_time() { // make the game state tick for every frame
     frame_time++;
-    if (get_mv()) movement_allowed++;
+    if (get_mv()) movement_allowed = 1;
 }
 
 void print_coords() { // for testing
@@ -54,19 +54,39 @@ void print_coords() { // for testing
     print_dec(frame_time);
 }
 
+/* ----------------- MAP MAKING ------------------ */
+
+// TODO connect to map making ????
+// return color code of obstacles
+int check_obstacle(double x, double y) { 
+    if (y < 800 && y > 700 && x > 400 && x < 600) { // blue block
+        return 1;
+    }
+    return 0; // return 0 if no obstacle
+}
+
+// return 1 if coordinates are within allowed limits
+int check_out_of_bounds(double x, double y) {
+    return x >= 0 && x <= MAP_WIDTH && y >= 0 && y <= MAP_HEIGHT;
+}
+
 /* ----------- some standard math -------------- */
+
 int factorial(int n) {
     if (n <= 1) return 1;
     return factorial(n - 1) * n;
 }
-int pow(int b, int e) {
-    int product = 1;
+double pow(double b, int e) {
+    double product = 1;
     for (int i = 0; i<e; i++) {
         product*=b;
     }
     return product;
 }
 double sin(double r) {
+    char neg = (r > PI/2 || r < -PI/2);
+    if (r > PI/2) r -= PI;
+    else if (r < -PI/2) r+= PI;
     double factor;
     double ans = 0;
     double accuracy = 4;
@@ -74,11 +94,15 @@ double sin(double r) {
         factor = pow(-1, i);
         double j = 2 * i + 1;
         double denominator = factorial((int) j);
-        ans = ans + factor * pow(r, j) / denominator;
+        ans += factor * pow(r, j) / denominator;
     }
+    if (neg) ans = -ans;
     return ans;
 }
 double cos(double r) {
+    char neg = (r > PI/2 || r < -PI/2);
+    if (r > PI/2) r -= PI;
+    else if (r < -PI/2) r+= PI;
     double factor;
     double ans = 0;
     double accuracy = 4;
@@ -86,18 +110,15 @@ double cos(double r) {
         factor = pow(-1, i);
         double j = 2 * i;
         double denominator = factorial((int) j);
-        ans = ans + factor * pow(r, j) / denominator;
+        ans += factor * pow(r, j) / denominator;
     }
+    if (neg) ans = -ans;
     return ans;
 }
-void translate_rotation() {
-    if (player_dir > 2*PI) player_dir-=2*PI;
-    else if (player_dir < 0) player_dir+=2*PI;
-}
-
-// return 1 if coordinates are within allowed limits
-int check_out_of_bounds(double x, double y) {
-    return x >= 0 && x <= MAP_WIDTH && y >= 0 && y <= MAP_HEIGHT;
+double translate_rotation(double dir) {
+    if (dir > PI) return dir-=2*PI;
+    else if (dir < -PI) return dir+=2*PI;
+    return dir;
 }
 
 void move(int commands) {
@@ -126,27 +147,18 @@ void move(int commands) {
     } 
     // turning
     if (commands & 32 && !(commands & 1)) { // turn left (switch 9)
-        player_dir-=turn_length;
-        translate_rotation();
+        player_dir=translate_rotation(player_dir-turn_length);
     } else if (commands & 1 && !(commands & 32)) { // turn right (switch 4)
-        player_dir+=turn_length;
-        translate_rotation();
+        player_dir=translate_rotation(player_dir+turn_length);
     } 
-    if (check_out_of_bounds(player_x+dx, player_y+dy)) {
+    if (check_out_of_bounds(player_x+dx, player_y+dy) && !check_obstacle(player_x+dx, player_y+dy)) {
         player_x += dx;
         player_y += dy;
     }
     print_coords();
 }
 
-// TODO connect to map making ????
-// return color code of obstacles
-int check_obstacle(double x, double y) { 
-    if (y < 800 && y > 700 && x > 450 && x < 550) { // blue block?
-        return 1;
-    }
-    return 0; // return 0 if no obstacle
-}
+
 
 int check_color(double dir) {
     double sin_dir = sin(dir);
@@ -157,21 +169,26 @@ int check_color(double dir) {
         // see if we encounter any obstacles before going out of bounds
         int obstacle = check_obstacle(check_x,check_y);
         if (obstacle) {
+            print("A");
             return obstacle;
         }
         // move along in direction
-        check_x += 2*step_length*sin_dir;
-        check_y += 2*step_length*cos_dir;
+        check_x += 1*step_length*sin_dir;
+        check_y += 1*step_length*cos_dir;
     }
+    print("W");
     return 0; // make color white if we reach the edge
 }
 
 // determine colors based on what player sees in RESOLUTION nbr of directions
 void look() {
-    double direction = player_dir - PI; // start behind player
+    double direction = player_dir+PI; // start behind player
+    print("DIR");
+    print_dec(direction*100);
     for (int i = 0; i<RESOLUTION; i++) {
-        colors[i] = check_color(direction);
+        colors[i] = check_color(translate_rotation(direction));
         direction+=(2*PI / RESOLUTION);
+        print_dec(translate_rotation(direction)*100);
     }
 }
 
