@@ -7,6 +7,7 @@ extern void print_dec(unsigned int);
 extern void game_loop();
 extern int* get_colors();
 extern void add_frame_time();
+extern int get_map();
 
 // declare global constants
 const int SCREEN_WIDTH = 320;
@@ -66,6 +67,14 @@ void make_bar(volatile char* buffer, int colors[], int resolution) {
     for (int i = 0; i<SCREEN_WIDTH; i++) {
       int color_index = ((i*resolution)/SCREEN_WIDTH);
       *(buffer+screen_middle+(SCREEN_WIDTH*j)+i) = decode_color(colors[color_index]);
+    }
+  }
+
+  // add map counter by drawing white lines, 10 offset from the edges
+  int map = get_map();
+  for (int j = 0; j < 8; j++) {
+    for (int i = 0; i < (map+1); i++) {
+      *(buffer+(SCREEN_WIDTH*(10+j))+10+i*3) = decode_color(0); // white
     }
   }
 }

@@ -20,7 +20,7 @@ double player_x;
 double player_y;
 double player_dir; // direction in radians
 int colors[RESOLUTION];
-int map;
+int active_map;
 int obstacle_range[4]; // {lowest x, highest x, lowest y, highest y}
 int frame_time = 0;
 int movement_allowed = 0;
@@ -29,10 +29,21 @@ int movement_allowed = 0;
 int* get_colors() {
     return colors;
 }
+int get_map() {
+    return active_map;
+}
 
 int get_btn(void) { // returns 1 while button is being pressed
   volatile int* btn_address = (volatile int*) 0x040000d0;
   return *btn_address &= 1; // just the least significant bit
+}
+
+void handle_switches(void) { // TODO fix or remove
+  volatile int* switch_address = (volatile int*) 0x04000010;
+  int active_sw = *switch_address &= 1023;  // only get the 10 least significant bits
+  if (active_sw & 960) {  // check bits 7,8,9,10 for now
+    print_dec(frame_time);
+  }
 }
 
 int get_mv() {  // check if movement switches are active
@@ -56,40 +67,68 @@ void print_coords() { // for testing
     print_dec(frame_time);
 }
 
+void game_init(int map) { // TODO menu to manually change map?
+    player_x = MAP_WIDTH/2;
+    player_y = MAP_HEIGHT/3;
+    player_dir = 0;
+    
+    //active_map = map; // TODO variable ?
+
+    static int x_range[] = {350, 400, 200, 900, 0, 0};
+    static int y_range[] = {750, 800, 0, 800, 0, 0};
+    obstacle_range[0] = x_range[(map*2)];
+    obstacle_range[1] = x_range[(map*2)+1];
+    obstacle_range[2] = y_range[(map*2)];
+    obstacle_range[3] = y_range[(map*2)+1];
+}
+
 /* ----------------- MAP MAKING ------------------ */
 
 // TODO connect to map making ????
 // return color code of obstacles
 int check_obstacle(double x, double y) {
-    switch (map) {
+    switch (active_map) {
         case 0:  // simple map, only goal
-            if (y < 800 && y > 750 && x < 400 && x > 350) return 1;
+            if (y > 750 && y < 800 && x > 350 && x < 400) return 1;
             break;
+
         case 1:  // test map with 1 obstacle
-            if (y < 800 && y > 700 && x > 400 && x < 600) { // green block
+            if (y > 700 && y < 800 && x > 400 && x < 600) { // green block
                 return 2;
             }
-            else if (y < 700 && y > 600 && x > 450 && x < 550) { // red block
+            else if (y > 500 && y < 650 && x > 600 && x < 800) { // red block
                 return 3;
             }
-            else if (y < 1000 && y > 950 && x < 400 && x > 350) { // cerise win!
+            else if (y > 200 && y < 400 && x > 200 && x < 300) { // red block
+                return 3; // TODO new color
+            }
+            else if (y > 100 && y < 200 && x > 700 && x < 800) { // red block
+                return 3; // TODO new color
+            }
+            else if (y > 0 && y < 50 && x > 850 && x < 900) { // cerise win!
                 return 1;
             }
+            break;
+
+        case 2:
+            break;
+        default:
             break;
     }
     
     return 0; // return 0 if no obstacle
 }
 
-int win_condition(double x, double y) {
-    if (check_obstacle(x, y) == 1) {
-        return 1;
+void check_for_win(double x, double y) {
+    if (check_obstacle(x, y) == 1) { // if win
+        print("win!");
+        active_map++;
+        game_init(active_map);
     }
-    return 0;
 }
 
 // return 1 if coordinates are within allowed limits
-int check_out_of_bounds(double x, double y) {
+int check_in_bounds(double x, double y) {
     return x >= 0 && x <= MAP_WIDTH && y >= 0 && y <= MAP_HEIGHT;
 }
 // return 1 if coordinates are out of range of all obstacles
@@ -97,7 +136,7 @@ int out_of_obstacle_range(double x, double y, double dir) {
     if (x <= obstacle_range[0] && dir < 0) return 1;
     if (x >= obstacle_range[1] && dir > 0) return 1;
     if (y <= obstacle_range[2] && (dir < -PI/2 || dir > PI/2)) return 1;
-    if (y >= obstacle_range[3] && (dir > -PI/2 || dir < PI/2)) return 1;
+    if (y >= obstacle_range[3] && !(dir < -PI/2 || dir > PI/2)) return 1;
     return 0;
 }
 
@@ -152,6 +191,9 @@ double translate_rotation(double dir) {
     return dir;
 }
 
+
+/* ----------------- player movement ------------------------ */
+
 void move(int commands) {
     double dx = 0;
     double dy = 0;
@@ -178,10 +220,10 @@ void move(int commands) {
     } else if (commands & 1 && !(commands & 32)) { // turn right (switch 4)
         player_dir=translate_rotation(player_dir+turn_length);
     } 
-    if (win_condition(player_x+dx, player_y+dy)) {
-        print("Win!");
-    }
-    if (check_out_of_bounds(player_x+dx, player_y+dy) && !check_obstacle(player_x+dx, player_y+dy)) {
+
+    // check movement for win and obstacles
+    check_for_win(player_x+dx, player_y+dy);
+    if (check_in_bounds(player_x+dx, player_y+dy) && !check_obstacle(player_x+dx, player_y+dy)) {
         player_x += dx;
         player_y += dy;
     }
@@ -189,6 +231,7 @@ void move(int commands) {
 }
 
 
+/* ------------ output calculations --------------------- */
 
 int check_color(double dir) {
     double sin_dir = sin(dir);
@@ -198,7 +241,7 @@ int check_color(double dir) {
     if (out_of_obstacle_range(check_x,check_y,dir)) {
         return 0;
     }
-    while(check_out_of_bounds(check_x,check_y)) {
+    while(check_in_bounds(check_x,check_y)) {
         // see if we encounter any obstacles before going out of bounds
         int obstacle = check_obstacle(check_x,check_y);
         if (obstacle) {
@@ -221,32 +264,13 @@ void look() {
     }
 }
 
-void handle_switches(void) { // TODO fix or remove
-  volatile int* switch_address = (volatile int*) 0x04000010;
-  int active_sw = *switch_address &= 1023;  // only get the 10 least significant bits
-  if (active_sw & 960) {  // check bits 7,8,9,10 for now
-    print_dec(frame_time);
-  }
-}
 
-void game_init() {
-    player_x = MAP_WIDTH/2;
-    player_y = MAP_HEIGHT/3;
-    
-    map = 0; // TODO variable
-
-    static int x_range[] = {350, 400};
-    static int y_range[] = {750, 800};
-    obstacle_range[0] = x_range[map];
-    obstacle_range[1] = x_range[map+1];
-    obstacle_range[2] = y_range[map];
-    obstacle_range[3] = y_range[map+1];
-}
+/* -------- main loop ------------------------- */
 
 void game_loop() {
     static int game_start = 1;
     if (game_start) {
-        game_init(); // TODO fix later
+        game_init(0); // TODO fix later
         game_start = 0;
     }
     
