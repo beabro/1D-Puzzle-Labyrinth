@@ -46,11 +46,16 @@ void run_init(void) { // more init-actions?
 int decode_color(int c) {
   /*
   0 --> white
-  1 --> blue
+  1 --> cerise
   2 --> green
   3 --> red
+  4 --> blue
   */
-  int colors[] = {0xff, 0x2, 0x10, 0x80};
+  int colors[] = {0xff, 193, 0x10, 0x80, 0x2};
+  //int colors[256];
+  //for (int i = 0; i < 256; i++) {
+  //  colors[i] = i;
+  //}
   if (c > sizeof(colors)/sizeof(colors[0])) return 0;
   return colors[c];
 }
