@@ -280,7 +280,7 @@ double cos(double r) { // works for r = [-pi, pi]
 double arctan(double r) { // works for r = [-1,1]
     double factor;
     double ans = 0;
-    double accuracy = 6;
+    double accuracy = 8;
     for (int i = 0; i < accuracy; i++) {
         factor = pow(-1, i);
         double j = 2 * i + 1;
@@ -288,25 +288,25 @@ double arctan(double r) { // works for r = [-1,1]
     }
     return ans;
 }
-double get_angle(double x, double y) { // return angle between player_dir and line to coords
+double get_angle(double x, double y) { // return angle to coords
     double dx = x-player_x;
     double dy = y-player_y;
     if (dy > 0) {
         if (dx/dy <= 1 && dx/dy >= -1) { // (x,y) above player
-            return arctan(dx/dy) - player_dir; 
+            return arctan(dx/dy); 
         }
     } else if (dy < 0) {
         if (dx/dy <= 1 && dx/dy >= -1) { // (x,y) below player
-            return arctan(dx/dy) + PI - player_dir; 
+            return arctan(dx/dy) + PI; 
         }
     }
     if (dx > 0) {
         if (dy/dx <= 1 && dy/dx >= -1) { // (x,y) right of player
-            return -arctan(dy/dx) + PI/2 - player_dir;
+            return -arctan(dy/dx) + PI/2;
         }
     } else if (dx < 0) {
         if (dy/dx <= 1 && dy/dx >= -1) { // (x,y) left of player
-            return -arctan(dy/dx) - PI/2 - player_dir;
+            return -arctan(dy/dx) - PI/2;
         }
     } 
     return 0; // should only be if dx=dy=0 --> never
@@ -320,9 +320,20 @@ double sqrt(double S) {
     }
     return ans;
 }
+double abs(double S) {
+    if (S >= 0) return S;
+    else return -S;
+}
 double translate_rotation(double dir) {
     if (dir > PI) return dir-=2*PI;
     else if (dir < -PI) return dir+=2*PI;
+    return dir;
+}
+double translate_small_rotation(double dir) {
+    while (dir >= PI/4 || dir <= -PI/4) {
+        if (dir >= PI/4) dir -= PI/2;
+        else dir += PI/2;
+    }
     return dir;
 }
 double hypotenuse(double dx, double dy) {
@@ -405,11 +416,16 @@ void look() {
 
 // return an objects total occupation angle in view
 double get_view(double distance, double size) {
-    if (size/(distance-block_size) <= 1) {
-        return arctan(size/(distance-block_size))*2;
-    } else return PI - PI*((distance-block_size)/size)/2; // nice gradual close ups
+    if (distance-size > 0) {
+        if (size/(distance-size) <= 1) {
+            return arctan(size/(distance-size))*2;
+        }
+    } // when player is too close to obstacle for the arctan to work
+    //return PI - abs(PI*((distance-block_size)/block_size)/2); // TODO make this nice somehow
+    return PI/2;
 }
 
+// second generation look function, allows better resolution but with some accuracy issues
 void look2() {
     // initialize distance with larger than possible values
     int distance[RESOLUTION];
@@ -419,16 +435,19 @@ void look2() {
     }
     for (int i = 0; i < sizeof(obstacles)/sizeof(obstacles[0]); i=i+3) {
         if (obstacles[i+2]) { // if obstacle not white --> exists
-            // get angle between player_dir and player-->object
+            // get angle between player and object (not player_dir yet)
             double angle = translate_rotation(get_angle(obstacles[i],obstacles[i+1]));
             // get object distance from player
             double object_distance = hypotenuse(obstacles[i]-player_x, obstacles[i+1]-player_y);
-            //double object_distance = sqrt((obstacles[i]-player_x)*(obstacles[i]-player_x) + (obstacles[i+1]-player_y)*(obstacles[i+1]-player_y));
+            // account for block diagonals being larger (maybe slightly useless)
+            double extra_block_size = abs(block_size*sin(translate_small_rotation(angle)));
+            // adjust angle to be between player_dir and player-->coords
+            angle -= player_dir; 
             // get total angle of object in player view
-            double view = get_view(object_distance,block_size); // TODO fix angle?
-            // calculate how many view chunks that angle is
+            double view = get_view(object_distance,block_size+extra_block_size); // TODO fix angle?
+            // calculate how many indices of RESOLUTION that is
             int occupied_chunks = ((RESOLUTION * view / PI) / 2) +1; // +1 to err upwards
-
+            // find start obstacle start index in player view
             int object_index = ((RESOLUTION*(angle+PI)/PI)/2)-occupied_chunks/2;
             if (object_index<0) object_index+=RESOLUTION;
 
