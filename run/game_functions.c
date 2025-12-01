@@ -9,11 +9,13 @@ extern int decode_color(int c);
 
 // constants ?
 #define PI 3.14159265
-#define RESOLUTION 80  // < 320 because of lack of pixels
+#define RESOLUTION 300  // < 320 because of lack of pixels
 int MAP_WIDTH = 1000;
 int MAP_HEIGHT = 1000;
+int block_size = 25 ; // half side
 int step_length = 5;
-double turn_length = PI/10;
+double turn_length = PI/30;
+
 
 // variables
 double player_x;
@@ -21,6 +23,7 @@ double player_y;
 double player_dir; // direction in radians
 int colors[RESOLUTION];
 int active_map;
+int obstacles[30]; // obstacle midpoints & color
 int obstacle_range[4]; // {lowest x, highest x, lowest y, highest y}
 int frame_time = 0;
 int movement_allowed = 0;
@@ -56,16 +59,24 @@ void add_frame_time() { // make the game state tick for every frame
     if (get_mv()) movement_allowed = 1;
 }
 
+void print_angle(double angle) {
+    if (angle >= 0) print_dec(angle*100);
+    else {
+        print("-");
+        print_dec(-angle*100);
+    }
+}
 void print_coords() { // for testing
     print("\nx: ");
     print_dec(player_x);
     print(", y: ");
     print_dec(player_y);
     print(", dir: ");
-    print_dec(player_dir*100);
+    print_angle(player_dir);
     print(", frame time: ");
     print_dec(frame_time);
 }
+
 
 void game_init(int map) { // TODO menu to manually change map?
     player_x = MAP_WIDTH/2;
@@ -73,17 +84,39 @@ void game_init(int map) { // TODO menu to manually change map?
     player_dir = 0;
     
     //active_map = map; // TODO variable ?
+                    // { x  y  color }
+    int obstacles1[] = {400,800,1};
+    int obstacles2[] = {900,25,1,500,600,3,550,600,3,600,600,3,550,550,2};
+    for (int i = 0; i < sizeof(obstacles1)/sizeof(obstacles1[0]); i++) {
+        obstacles[i] = obstacles1[i];
+    }
 
+    /*
     static int x_range[] = {350, 400, 200, 900, 0, 0};
     static int y_range[] = {750, 800, 0, 800, 0, 0};
     obstacle_range[0] = x_range[(map*2)];
     obstacle_range[1] = x_range[(map*2)+1];
     obstacle_range[2] = y_range[(map*2)];
     obstacle_range[3] = y_range[(map*2)+1];
+    */
 }
 
 /* ----------------- MAP MAKING ------------------ */
 
+int check_obstacle2(double x, double y) {
+    for (int i = 0; i < sizeof(obstacles)/sizeof(obstacles[0]); i=i+3) {
+        if (obstacles[i] || obstacles[i+1]) { // if obstacle exists
+            int obstacle_x[] = {obstacles[i]-block_size, obstacles[i]+block_size};
+            int obstacle_y[] = {obstacles[i+1]-block_size, obstacles[i+1]+block_size};
+            if (x >= obstacle_x[0] && x <= obstacle_x[1] && y >= obstacle_y[0] && y <= obstacle_y[1]) {
+                return obstacles[i+2]; // obstacle color
+            }
+        }
+    }
+    return 0;
+}
+
+/*
 // TODO connect to map making ????
 // return color code of obstacles
 int check_obstacle(double x, double y) {
@@ -118,12 +151,13 @@ int check_obstacle(double x, double y) {
     
     return 0; // return 0 if no obstacle
 }
+*/
 
 void check_for_win(double x, double y) {
-    if (check_obstacle(x, y) == 1) { // if win
+    if (check_obstacle2(x, y) == 1) { // if win
         print("win!");
-        active_map++;
-        game_init(active_map);
+        //active_map++;
+        //game_init(active_map);
     }
 }
 
@@ -131,6 +165,7 @@ void check_for_win(double x, double y) {
 int check_in_bounds(double x, double y) {
     return x >= 0 && x <= MAP_WIDTH && y >= 0 && y <= MAP_HEIGHT;
 }
+/*
 // return 1 if coordinates are out of range of all obstacles
 int out_of_obstacle_range(double x, double y, double dir) {
     if (x <= obstacle_range[0] && dir < 0) return 1;
@@ -139,6 +174,7 @@ int out_of_obstacle_range(double x, double y, double dir) {
     if (y >= obstacle_range[3] && !(dir < -PI/2 || dir > PI/2)) return 1;
     return 0;
 }
+*/
 
 /* ----------- some standard math -------------- */
 
@@ -153,7 +189,7 @@ double pow(double b, int e) {
     }
     return product;
 }
-double sin(double r) {
+double sin(double r) { // works for r = [-pi, pi]
     char neg = (r > PI/2 || r < -PI/2);
     if (r > PI/2) r -= PI;
     else if (r < -PI/2) r+= PI;
@@ -169,7 +205,7 @@ double sin(double r) {
     if (neg) ans = -ans;
     return ans;
 }
-double cos(double r) {
+double cos(double r) { // works for r = [-pi, pi]
     char neg = (r > PI/2 || r < -PI/2);
     if (r > PI/2) r -= PI;
     else if (r < -PI/2) r+= PI;
@@ -183,6 +219,49 @@ double cos(double r) {
         ans += factor * pow(r, j) / denominator;
     }
     if (neg) ans = -ans;
+    return ans;
+}
+double arctan(double r) { // works for r = [-1,1]
+    double factor;
+    double ans = 0;
+    double accuracy = 6;
+    for (int i = 0; i < accuracy; i++) {
+        factor = pow(-1, i);
+        double j = 2 * i + 1;
+        ans += factor * pow(r, j) / j;
+    }
+    return ans;
+}
+double get_angle(double x, double y) { // return angle between player_dir and line to coords
+    double dx = x-player_x;
+    double dy = y-player_y;
+    if (dy > 0) {
+        if (dx/dy <= 1 && dx/dy >= -1) { // (x,y) above player
+            return arctan(dx/dy) - player_dir; 
+        }
+    } else if (dy < 0) {
+        if (dx/dy <= 1 && dx/dy >= -1) { // (x,y) below player
+            return arctan(dx/dy) + PI - player_dir; 
+        }
+    }
+    if (dx > 0) {
+        if (dy/dx <= 1 && dy/dx >= -1) { // (x,y) right of player
+            return -arctan(dy/dx) + PI/2 - player_dir;
+        }
+    } else if (dx < 0) {
+        if (dy/dx <= 1 && dy/dx >= -1) { // (x,y) left of player
+            return -arctan(dy/dx) - PI/2 - player_dir;
+        }
+    } 
+    return 0; // should only be if dx=dy=0 --> never
+}
+double sqrt(double S) {
+    double d = 1;
+    double ans = S/2;
+    while (d > 0.1) {
+        d = ans - (ans+(S/ans))/2;
+        ans -= d;
+    }
     return ans;
 }
 double translate_rotation(double dir) {
@@ -223,7 +302,7 @@ void move(int commands) {
 
     // check movement for win and obstacles
     check_for_win(player_x+dx, player_y+dy);
-    if (check_in_bounds(player_x+dx, player_y+dy) && !check_obstacle(player_x+dx, player_y+dy)) {
+    if (check_in_bounds(player_x+dx, player_y+dy) && !check_obstacle2(player_x+dx, player_y+dy)) {
         player_x += dx;
         player_y += dy;
     }
@@ -233,6 +312,7 @@ void move(int commands) {
 
 /* ------------ output calculations --------------------- */
 
+/*
 int check_color(double dir) {
     double sin_dir = sin(dir);
     double cos_dir = cos(dir);
@@ -243,7 +323,7 @@ int check_color(double dir) {
     }
     while(check_in_bounds(check_x,check_y)) {
         // see if we encounter any obstacles before going out of bounds
-        int obstacle = check_obstacle(check_x,check_y);
+        int obstacle = check_obstacle2(check_x,check_y);
         if (obstacle) {
             return obstacle;
         }
@@ -252,8 +332,7 @@ int check_color(double dir) {
         check_y += 1*step_length*cos_dir;
     }
     return 0; // make color white if we reach the edge
-}
-
+} 
 // determine colors based on what player sees in RESOLUTION nbr of directions
 void look() {
     double direction = player_dir+PI; // start behind player
@@ -261,6 +340,52 @@ void look() {
         colors[i] = check_color(translate_rotation(direction));
         //colors[i] = i+192;
         direction+=(2*PI / RESOLUTION);
+    }
+}    
+*/
+
+// return an objects total occupation angle in view
+double get_view(double distance, double size) {
+    if (size/(distance-block_size) <= 1) {
+        return arctan(size/(distance-block_size))*2;
+    } else return PI - PI*((distance-block_size)/size)/2; // nice gradual close ups
+}
+
+void look2() {
+    // initialize distance with larger than possible values
+    int distance[RESOLUTION];
+    for (int i = 0; i < RESOLUTION; i++) {
+        distance[i] = MAP_HEIGHT+MAP_WIDTH;
+        colors[i] = 0; // reset colors between looks
+    }
+    for (int i = 0; i < sizeof(obstacles)/sizeof(obstacles[0]); i=i+3) {
+        if (obstacles[i+2]) { // if obstacle not white --> exists
+            // get angle between player_dir and player-->object
+            double angle = translate_rotation(get_angle(obstacles[i],obstacles[i+1]));
+            // get object distance from player
+            double object_distance = sqrt((obstacles[i]-player_x)*(obstacles[i]-player_x) + (obstacles[i+1]-player_y)*(obstacles[i+1]-player_y));
+            // get total angle of object in player view
+            double view = get_view(object_distance,block_size); // TODO fix angle?
+            // calculate how many view chunks that angle is
+            int occupied_chunks = (RESOLUTION * view / PI) / 2;
+
+            int object_index = ((RESOLUTION*(angle+PI)/PI)/2)-occupied_chunks/2;
+            if (object_index<0) object_index+=RESOLUTION;
+
+            print("\nAngle: ");
+            print_angle(angle);
+
+            // assign colors, check distance to not overwrite closer colors
+            while (occupied_chunks>0) {
+                if (object_distance < distance[object_index]) {
+                    colors[object_index] = obstacles[i+2];
+                }
+                object_index++;
+                // loop around index if reached end of array
+                if (object_index>=RESOLUTION) object_index-=RESOLUTION;
+                occupied_chunks--;
+            }
+        }
     }
 }
 
@@ -282,7 +407,7 @@ void game_loop() {
     if (movement_allowed) { // deal with movement if allowed by timer
         move(get_mv());  
         movement_allowed--;
-        look();
+        look2();
     }
 
     if (frame_time) {
