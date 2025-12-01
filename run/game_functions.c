@@ -211,7 +211,9 @@ int check_obstacle(double x, double y) {
 
 void check_for_win(double x, double y) {
     if (check_obstacle2(x, y) == 1) { // if win
-        print("win!");
+        print("\nLevel ");
+        print_dec(active_map+1);
+        print(" complete!");
         active_map++;
         game_init(active_map);
     }
