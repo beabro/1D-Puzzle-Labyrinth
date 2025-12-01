@@ -51,8 +51,9 @@ int decode_color(int c) {
   2 --> green
   3 --> red
   4 --> blue
+  5 --> yellow
   */
-  int colors[] = {0xff, 193, 0x10, 0x80, 0x2};
+  int colors[] = {0xff, 193, 0x10, 0x80, 0x2, 180};
   //int colors[256];
   //for (int i = 0; i < 256; i++) {
   //  colors[i] = i;

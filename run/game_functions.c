@@ -9,7 +9,7 @@ extern int decode_color(int c);
 
 // constants ?
 #define PI 3.14159265
-#define RESOLUTION 300  // < 320 because of lack of pixels
+#define RESOLUTION 320  // <= 320 because of lack of pixels
 int MAP_WIDTH = 1000;
 int MAP_HEIGHT = 1000;
 int block_size = 25 ; // half side
@@ -23,7 +23,7 @@ double player_y;
 double player_dir; // direction in radians
 int colors[RESOLUTION];
 int active_map;
-int obstacles[30]; // obstacle midpoints & color
+int obstacles[120]; // obstacle midpoints & color
 int obstacle_range[4]; // {lowest x, highest x, lowest y, highest y}
 int frame_time = 0;
 int movement_allowed = 0;
@@ -41,12 +41,11 @@ int get_btn(void) { // returns 1 while button is being pressed
   return *btn_address &= 1; // just the least significant bit
 }
 
-void handle_switches(void) { // TODO fix or remove
+// change levels with switches 0,1,2,3
+int get_level_change(void) { // TODO fix or remove
   volatile int* switch_address = (volatile int*) 0x04000010;
-  int active_sw = *switch_address &= 1023;  // only get the 10 least significant bits
-  if (active_sw & 960) {  // check bits 7,8,9,10 for now
-    print_dec(frame_time);
-  }
+  int active_sw = *switch_address &= 15;  // only get the 4 least significant bits
+  return active_sw;
 }
 
 int get_mv() {  // check if movement switches are active
@@ -59,13 +58,19 @@ void add_frame_time() { // make the game state tick for every frame
     if (get_mv()) movement_allowed = 1;
 }
 
+// allows slight screen freeze on win? TODO
+void delay(int frames) {
+
+}
+
+// support print for play testing
 void print_angle(double angle) {
     if (angle >= 0) print_dec(angle*100);
     else {
         print("-");
         print_dec(-angle*100);
     }
-}
+} // support print for play testing
 void print_coords() { // for testing
     print("\nx: ");
     print_dec(player_x);
@@ -84,12 +89,63 @@ void game_init(int map) { // TODO menu to manually change map?
     player_dir = 0;
     
     //active_map = map; // TODO variable ?
-                    // { x  y  color }
-    int obstacles1[] = {400,800,1};
-    int obstacles2[] = {900,25,1,500,600,3,550,600,3,600,600,3,550,550,2};
-    for (int i = 0; i < sizeof(obstacles1)/sizeof(obstacles1[0]); i++) {
-        obstacles[i] = obstacles1[i];
+    // reset obstacles
+    for (int i = 0; i < sizeof(obstacles)/sizeof(obstacles[0]);i++) {
+        obstacles[i]=0;
     }
+                    // { x  y  color }
+    // Level 0: simple only goal
+    int obstacles0[] = {400,800,1};
+    // Level 1: a few obstacles in front of the goal
+    int obstacles1[] = {550,800,1,500,600,3,550,600,3,600,600,3,550,550,2};
+    // Level 2: scattered obstacles, goal hidden behind one of them
+    int obstacles2[] = {875,25,1,
+        400,700,2,400,750,2,450,700,2,450,750,2,500,700,2,500,750,2,
+        650,500,3,650,550,3,700,500,3,700,550,3,
+        200,200,4,200,250,4,200,300,4,200,350,4,250,200,4,250,250,4,250,300,4,250,350,4,
+        750,100,5,750,150,5,800,100,5,800,150,5};
+    // Level 3: box with goal hidden inside
+    int obstacles3[] = {350,400,3,400,400,3,450,400,3,500,400,3,550,400,3,600,400,3,650,400,3,
+        350,450,3,350,500,3,350,550,3,350,600,3,350,650,3, // left wall
+        650,450,3,650,500,3,650,550,3,650,600,3,650,650,3, // right wall
+        450,650,3,500,650,3,550,650,3,  // top wall with holes
+        400,450,4,450,450,4,500,450,4,550,450,4,600,450,4, // blue liner in box
+        500,600,1};  // goal!
+    // labyrinth with goal in the middle  (spawn 500,333)
+    int obstacles4[] = {};
+
+    // load the active map into obstacles
+    switch (active_map) {
+        case (0):
+            for (int i = 0; i < sizeof(obstacles0)/sizeof(obstacles0[0]); i++) {
+                obstacles[i] = obstacles0[i];
+            }
+            break;
+        case (1):
+            for (int i = 0; i < sizeof(obstacles1)/sizeof(obstacles1[0]); i++) {
+                obstacles[i] = obstacles1[i];
+            }
+            break;
+        case (2):
+            for (int i = 0; i < sizeof(obstacles2)/sizeof(obstacles2[0]); i++) {
+                obstacles[i] = obstacles2[i];
+            }
+            break;
+        case (3):
+            for (int i = 0; i < sizeof(obstacles3)/sizeof(obstacles3[0]); i++) {
+                obstacles[i] = obstacles3[i];
+            }
+            break;
+        case (4):
+            for (int i = 0; i < sizeof(obstacles4)/sizeof(obstacles4[0]); i++) {
+                obstacles[i] = obstacles4[i];
+            }
+            break;
+        default:
+            
+    }
+    
+    
 
     /*
     static int x_range[] = {350, 400, 200, 900, 0, 0};
@@ -101,7 +157,7 @@ void game_init(int map) { // TODO menu to manually change map?
     */
 }
 
-/* ----------------- MAP MAKING ------------------ */
+/* ----------------- MAP CHECKS ------------------ */
 
 int check_obstacle2(double x, double y) {
     for (int i = 0; i < sizeof(obstacles)/sizeof(obstacles[0]); i=i+3) {
@@ -156,8 +212,8 @@ int check_obstacle(double x, double y) {
 void check_for_win(double x, double y) {
     if (check_obstacle2(x, y) == 1) { // if win
         print("win!");
-        //active_map++;
-        //game_init(active_map);
+        active_map++;
+        game_init(active_map);
     }
 }
 
@@ -269,6 +325,9 @@ double translate_rotation(double dir) {
     else if (dir < -PI) return dir+=2*PI;
     return dir;
 }
+double hypotenuse(double dx, double dy) {
+    return sqrt((dx*dx) + (dy*dy));
+}
 
 
 /* ----------------- player movement ------------------------ */
@@ -363,22 +422,21 @@ void look2() {
             // get angle between player_dir and player-->object
             double angle = translate_rotation(get_angle(obstacles[i],obstacles[i+1]));
             // get object distance from player
-            double object_distance = sqrt((obstacles[i]-player_x)*(obstacles[i]-player_x) + (obstacles[i+1]-player_y)*(obstacles[i+1]-player_y));
+            double object_distance = hypotenuse(obstacles[i]-player_x, obstacles[i+1]-player_y);
+            //double object_distance = sqrt((obstacles[i]-player_x)*(obstacles[i]-player_x) + (obstacles[i+1]-player_y)*(obstacles[i+1]-player_y));
             // get total angle of object in player view
             double view = get_view(object_distance,block_size); // TODO fix angle?
             // calculate how many view chunks that angle is
-            int occupied_chunks = (RESOLUTION * view / PI) / 2;
+            int occupied_chunks = ((RESOLUTION * view / PI) / 2) +1; // +1 to err upwards
 
             int object_index = ((RESOLUTION*(angle+PI)/PI)/2)-occupied_chunks/2;
             if (object_index<0) object_index+=RESOLUTION;
-
-            print("\nAngle: ");
-            print_angle(angle);
 
             // assign colors, check distance to not overwrite closer colors
             while (occupied_chunks>0) {
                 if (object_distance < distance[object_index]) {
                     colors[object_index] = obstacles[i+2];
+                    distance[object_index] = object_distance;
                 }
                 object_index++;
                 // loop around index if reached end of array
@@ -395,14 +453,15 @@ void look2() {
 void game_loop() {
     static int game_start = 1;
     if (game_start) {
-        game_init(0); // TODO fix later
+        active_map = 0;
+        game_init(active_map); // TODO fix later if allow map choice
         game_start = 0;
     }
     
-    if (get_btn()) { // button reset, TODO fix something good
-        player_x = 500;
-        player_y = 500;
-        player_dir = 0;
+    if (get_btn()) { // button reset, TODO fix something good, fixed?
+        active_map = get_level_change();
+        game_init(active_map);
+        look2();
     }
     if (movement_allowed) { // deal with movement if allowed by timer
         move(get_mv());  
