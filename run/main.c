@@ -52,9 +52,10 @@ int decode_color(int c) {
   3 --> red
   4 --> blue
   5 --> yellow
+  6 --> black
   */
-  int colors[] = {0xff, 193, 0x10, 0x80, 0x2, 180};
-  //int colors[256];
+  int colors[] = {0xff, 193, 0x10, 0x80, 0x2, 180, 0};
+  //int colors[256]; // support code to view all colors
   //for (int i = 0; i < 256; i++) {
   //  colors[i] = i;
   //}
@@ -74,8 +75,9 @@ void make_bar(volatile char* buffer, int colors[], int resolution) {
   // add map counter by drawing white lines, 10 offset from the edges
   int map = get_map();
   for (int j = 0; j < 8; j++) {
-    for (int i = 0; i < (map+1); i++) {
-      *(buffer+(SCREEN_WIDTH*(10+j))+10+i*3) = decode_color(0); // white
+    for (int i = 0; i < (16); i++) { // 16 is enough for 4 map switches
+      if (i < map+1) *(buffer+(SCREEN_WIDTH*(10+j))+10+i*3) = decode_color(0); // white
+      else *(buffer+(SCREEN_WIDTH*(10+j))+10+i*3) = decode_color(6); // black to allow decreased map count
     }
   }
 }
