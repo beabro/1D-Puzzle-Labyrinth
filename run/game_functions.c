@@ -59,8 +59,7 @@ void add_frame_time() { // make the game state tick for every frame
 }
 
 // allows slight screen freeze on win? TODO
-void delay(int frames) {
-
+void delay(int seconds) {
 }
 
 // support print for play testing
@@ -83,12 +82,13 @@ void print_coords() { // for testing
 }
 
 
-void game_init(int map) { // TODO menu to manually change map?
+void game_init(int map) { // TODO UI menu to manually change map?
+    active_map = map; // set active map
+    // initialize player start location // TODO make variable for different maps?
     player_x = MAP_WIDTH/2;
     player_y = MAP_HEIGHT/3;
     player_dir = 0;
     
-    //active_map = map; // TODO variable ?
     // reset obstacles
     for (int i = 0; i < sizeof(obstacles)/sizeof(obstacles[0]);i++) {
         obstacles[i]=0;
@@ -97,7 +97,8 @@ void game_init(int map) { // TODO menu to manually change map?
     // Level 0: simple only goal
     int obstacles0[] = {400,800,1};
     // Level 1: a few obstacles in front of the goal
-    int obstacles1[] = {550,800,1,500,600,3,550,600,3,600,600,3,550,550,2};
+    int obstacles1[] = {550,800,1,500,500,2, // cerise and green blocks
+        350,600,3,400,600,3,450,600,3,500,600,3,550,600,3,600,600,3,650,600,3,700,600,3}; // red bar
     // Level 2: scattered obstacles, goal hidden behind one of them
     int obstacles2[] = {875,25,1,
         400,700,2,400,750,2,450,700,2,450,750,2,500,700,2,500,750,2,
@@ -173,8 +174,7 @@ int check_obstacle2(double x, double y) {
 }
 
 /*
-// TODO connect to map making ????
-// return color code of obstacles
+// return color code of obstacles, OLD VERSION
 int check_obstacle(double x, double y) {
     switch (active_map) {
         case 0:  // simple map, only goal
@@ -189,10 +189,10 @@ int check_obstacle(double x, double y) {
                 return 3;
             }
             else if (y > 200 && y < 400 && x > 200 && x < 300) { // red block
-                return 3; // TODO new color
+                return 3;
             }
             else if (y > 100 && y < 200 && x > 700 && x < 800) { // red block
-                return 3; // TODO new color
+                return 3;
             }
             else if (y > 0 && y < 50 && x > 850 && x < 900) { // cerise win!
                 return 1;
@@ -211,11 +211,13 @@ int check_obstacle(double x, double y) {
 
 void check_for_win(double x, double y) {
     if (check_obstacle2(x, y) == 1) { // if win
+        // print victory message
         print("\nLevel ");
         print_dec(active_map+1);
         print(" complete!");
-        active_map++;
-        game_init(active_map);
+        // start next map after delay
+        delay(3);
+        game_init(active_map+1);
     }
 }
 
@@ -224,7 +226,7 @@ int check_in_bounds(double x, double y) {
     return x >= 0 && x <= MAP_WIDTH && y >= 0 && y <= MAP_HEIGHT;
 }
 /*
-// return 1 if coordinates are out of range of all obstacles
+// return 1 if coordinates are out of range of all obstacles, OLD VERSION
 int out_of_obstacle_range(double x, double y, double dir) {
     if (x <= obstacle_range[0] && dir < 0) return 1;
     if (x >= obstacle_range[1] && dir > 0) return 1;
@@ -385,6 +387,7 @@ void move(int commands) {
 /* ------------ output calculations --------------------- */
 
 /*
+// probe for the first color encountered in given direction, OLD VERSION
 int check_color(double dir) {
     double sin_dir = sin(dir);
     double cos_dir = cos(dir);
@@ -405,7 +408,7 @@ int check_color(double dir) {
     }
     return 0; // make color white if we reach the edge
 } 
-// determine colors based on what player sees in RESOLUTION nbr of directions
+// determine colors based on what player sees in RESOLUTION nbr of directions, OLD VERSION
 void look() {
     double direction = player_dir+PI; // start behind player
     for (int i = 0; i<RESOLUTION; i++) {
@@ -423,8 +426,8 @@ double get_view(double distance, double size) {
             return arctan(size/(distance-size))*2;
         }
     } // when player is too close to obstacle for the arctan to work
-    //return PI - abs(PI*((distance-block_size)/block_size)/2); // TODO make this nice somehow
-    return PI/2;
+    //return PI - abs(PI*((distance-block_size)/block_size)/2); // make this nice somehow, EDIT: this was not nice :(
+    return PI/2; // TODO: fix with dx and dy?
 }
 
 // second generation look function, allows better resolution but with some accuracy issues
@@ -446,7 +449,7 @@ void look2() {
             // adjust angle to be between player_dir and player-->coords
             angle -= player_dir; 
             // get total angle of object in player view
-            double view = get_view(object_distance,block_size+extra_block_size); // TODO fix angle?
+            double view = get_view(object_distance,block_size+extra_block_size); // TODO: check this actually works
             // calculate how many indices of RESOLUTION that is
             int occupied_chunks = ((RESOLUTION * view / PI) / 2) +1; // +1 to err upwards
             // find start obstacle start index in player view
@@ -474,14 +477,12 @@ void look2() {
 void game_loop() {
     static int game_start = 1;
     if (game_start) {
-        active_map = 0;
-        game_init(active_map); // TODO fix later if allow map choice
+        game_init(0); // start with map 0
         game_start = 0;
     }
     
-    if (get_btn()) { // button reset, TODO fix something good, fixed?
-        active_map = get_level_change();
-        game_init(active_map);
+    if (get_btn()) { // button reset, change map to value of first 4 switches
+        game_init(get_level_change());
         look2();
     }
     if (movement_allowed) { // deal with movement if allowed by timer
