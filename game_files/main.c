@@ -58,6 +58,13 @@ int decode_color(int c) {
   return colors[c];
 }
 
+// only needed when not re-printing the bar
+void clear_buffer(volatile char* buffer) {
+  for (int i = 0; i < SCREEN_HEIGHT*SCREEN_HEIGHT; i++) {
+    *(buffer+i) = 0;
+  }
+}
+
 // add colored line to VGA buffer
 void make_bar(volatile char* buffer, int colors[], int resolution) {
   int screen_middle = (SCREEN_WIDTH*(SCREEN_HEIGHT/2 -BAR_HEIGHT/2));

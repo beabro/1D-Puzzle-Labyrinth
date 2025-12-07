@@ -13,8 +13,8 @@ extern int decode_color(int c);
 const int MAP_WIDTH = 1000;
 const int MAP_HEIGHT = 1000;
 const int block_size = 25 ; // half side of blocks
-const int step_length = 5;
-const double turn_length = PI/30;
+const int step_length = 1;
+const double turn_length = PI/90;
 
 
 // global variables
@@ -26,6 +26,7 @@ int active_map;
 int obstacles[120]; // obstacle midpoints & color, may need increased limit
 int frame_time = 0;
 int movement_allowed = 0;
+//int HOLD_IT = 0;
 
 
 int* get_colors() {
@@ -57,11 +58,14 @@ int get_mv() {
 void add_frame_time() { 
     frame_time++;
     if (get_mv()) movement_allowed = 1;
+    //if (HOLD_IT) HOLD_IT--;
 }
 
 // allows slight screen freeze (e.g. on win)? TODO
+/*
 void delay(int seconds) {
-}
+    HOLD_IT = seconds*30; // 30 FPS
+}*/
 
 // support print for play testing
 void print_angle(double angle) {
@@ -115,7 +119,14 @@ void game_init(int map) { // TODO UI menu to manually change map?
         400,450,4,450,450,4,500,450,4,550,450,4,600,450,4, // blue liner in box
         500,600,1};  // goal!
     // Level 4: big boxes with a hidden goal
-    int obstacles4[] = {};
+    int obstacles4[] = {900,850,1,850,900,5,900,900,5,950,900,5,850,850,5,850,800,5,950,800,5,
+        100,150,5,150,150,5,200,150,5,100,200,5,150,200,5,200,200,5,
+        150,800,2,200,800,2,250,800,2,150,850,2,200,850,2,250,850,2,150,900,2,200,900,2,250,900,2,
+        800,50,2,850,50,2,900,50,2,800,100,2,850,100,2,900,100,2,
+        450,450,3,500,450,3,500,450,3,500,500,3,
+        500,20,3,550,20,3,600,20,3,
+        300,300,4,600,950,4,400,150,4,700,550,4,600,100,4 // random blues
+    };
     // labyrinth with goal in the middle  (spawn 500,333)
     int obstacles5[] = {};
 
@@ -153,7 +164,9 @@ void game_init(int map) { // TODO UI menu to manually change map?
             }
             break;
         default:
-           
+            for (int i = 0; i < sizeof(obstacles)/sizeof(obstacles[0]); i++) {
+                obstacles[i] = 0;
+            }
     } 
 }
 
@@ -181,7 +194,7 @@ void check_for_win(double x, double y) {
         print_dec(active_map+1);
         print(" complete!");
         // start next map after delay
-        delay(3);
+        //delay(3);
         game_init(active_map+1);
     }
 }
