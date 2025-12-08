@@ -29,7 +29,7 @@ void run_init(void) {
   enable_interrupt();
   // prepare timer
   volatile int* timer_address = (volatile int*) 0x04000020; // to 0x0400003F
-  int TO_period = (3000000-1)/FPS; // 0.1s for 30MHz clock
+  int TO_period = (300000-1)/FPS; // 1s for 30MHz clock
   *(timer_address+2) = TO_period & 0xffff; // 16 lsb in first TO register
   *(timer_address+3) = TO_period>>16; // 16 msb in second TO register
 
@@ -102,11 +102,10 @@ void set_vga(int colors[], int res) {  // two buffers for smooth transitions bet
   }
   *(vga_address) = 1; // swap active_buffer
   active_buffer = !active_buffer; // track the swap
-  //print_dec(active_buffer); // TEST to track frame changes
 }
 
 void handle_interrupt(unsigned cause) {
-    static int timeoutcount = 0; // initialize the timeout counter
+    //static int timeoutcount = 0; // initialize the timeout counter
     volatile int* timer_address = (volatile int*) 0x04000020;
     //volatile int* switch_address = (volatile int*) 0x04000010;
     //volatile int* button_address = (volatile int*) TODO;
@@ -114,11 +113,11 @@ void handle_interrupt(unsigned cause) {
     switch (cause) {
         case 16: //timer
             *(timer_address) = 0; // reset status TO to 0 stops sending IRQ
-            timeoutcount++;
-            if (timeoutcount==10) { // activate every 0.1*10 s
-                timeoutcount=0;
+            //timeoutcount++;
+            //if (timeoutcount==10) { // activate every 0.1*10 s
+            //    timeoutcount=0;
                 add_frame_time();
-            }
+            //}
             break;
         default:
             break;

@@ -14,7 +14,7 @@ const int MAP_WIDTH = 1000;
 const int MAP_HEIGHT = 1000;
 const int block_size = 25 ; // half side of blocks
 const int step_length = 1;
-const double turn_length = PI/90;
+const double turn_length = PI/120;
 
 
 // global variables
@@ -23,7 +23,7 @@ double player_y;
 double player_dir; // direction in radians
 int colors[RESOLUTION]; // color array sent to VGA
 int active_map;
-int obstacles[120]; // obstacle midpoints & color, may need increased limit
+int obstacles[256]; // obstacle midpoints & color, may need increased limit
 int frame_time = 0;
 int movement_allowed = 0;
 //int HOLD_IT = 0;
@@ -96,7 +96,7 @@ void game_init(int map) { // TODO UI menu to manually change map?
     player_dir = 0;
     
     // reset obstacles
-    for (int i = 0; i < sizeof(obstacles)/sizeof(obstacles[0]);i++) {
+    for (int i = 0; i < sizeof(obstacles)/sizeof(obstacles[0]);i++) { // 4 == sizeof(int)
         obstacles[i]=0;
     }
                     // { x  y  color }
@@ -125,10 +125,10 @@ void game_init(int map) { // TODO UI menu to manually change map?
         800,50,2,850,50,2,900,50,2,800,100,2,850,100,2,900,100,2,
         450,450,3,500,450,3,500,450,3,500,500,3,
         500,20,3,550,20,3,600,20,3,
-        300,300,4,600,950,4,400,150,4,700,550,4,600,100,4 // random blues
+        300,300,4,600,950,4,400,150,4,700,550,4,600,100,4,850,700,4,800,700,4 // random blues
     };
     // labyrinth with goal in the middle  (spawn 500,333)
-    int obstacles5[] = {};
+    //int obstacles5[] = {};
 
     
     // load the active map into obstacles (separated because arrays are a mess)
@@ -158,11 +158,12 @@ void game_init(int map) { // TODO UI menu to manually change map?
                 obstacles[i] = obstacles4[i];
             }
             break;
+            /*
         case (5):
             for (int i = 0; i < sizeof(obstacles5)/sizeof(obstacles5[0]); i++) {
                 obstacles[i] = obstacles5[i];
             }
-            break;
+            break;*/
         default:
             for (int i = 0; i < sizeof(obstacles)/sizeof(obstacles[0]); i++) {
                 obstacles[i] = 0;
@@ -174,10 +175,10 @@ void game_init(int map) { // TODO UI menu to manually change map?
 
 // return obstacle color if coordinates are inside an obstacle
 int check_obstacle2(double x, double y) {
-    for (int i = 0; i < sizeof(obstacles)/sizeof(obstacles[0]); i=i+3) {
-        if (obstacles[i] || obstacles[i+1]) { // if obstacle exists
-            int obstacle_x[] = {obstacles[i]-block_size, obstacles[i]+block_size};
-            int obstacle_y[] = {obstacles[i+1]-block_size, obstacles[i+1]+block_size};
+    for (int i = 2; i < sizeof(obstacles)/sizeof(obstacles[0]); i=i+3) {
+        if (obstacles[i]) { // if obstacle not white --> exists
+            int obstacle_x[] = {obstacles[i-2]-block_size, obstacles[i-2]+block_size};
+            int obstacle_y[] = {obstacles[i-1]-block_size, obstacles[i-1]+block_size};
             if (x >= obstacle_x[0] && x <= obstacle_x[1] && y >= obstacle_y[0] && y <= obstacle_y[1]) {
                 return obstacles[i+2]; // obstacle color
             }
@@ -348,7 +349,7 @@ void move(int commands) {
     } 
     // turning
     if (commands & 32 && !(commands & 1)) { // turn left (switch 9)
-        player_dir=translate_rotation(player_dir-turn_length);
+       player_dir=translate_rotation(player_dir-turn_length);
     } else if (commands & 1 && !(commands & 32)) { // turn right (switch 4)
         player_dir=translate_rotation(player_dir+turn_length);
     } 
@@ -359,7 +360,7 @@ void move(int commands) {
         player_x += dx;
         player_y += dy;
     }
-    print_coords(); // activate for easy player tracking
+    //print_coords(); // activate for easy player tracking
 }
 
 
@@ -384,18 +385,19 @@ void look2() {
         distance[i] = MAP_HEIGHT+MAP_WIDTH;
         colors[i] = 0; // reset colors between looks
     }
-    for (int i = 0; i < sizeof(obstacles)/sizeof(obstacles[0]); i=i+3) {
-        if (obstacles[i+2]) { // if obstacle not white --> exists
+    for (int i = 2; i < sizeof(obstacles)/sizeof(obstacles[0]); i=i+3) { // 4 == sizeof(int)
+        if (obstacles[i]) { // if obstacle not white --> exists
             // get angle between player and object (not player_dir yet)
-            double angle = translate_rotation(get_angle(obstacles[i],obstacles[i+1]));
+            double angle = translate_rotation(get_angle(obstacles[i-2],obstacles[i-1]));
             // get object distance from player
-            double object_distance = hypotenuse(obstacles[i]-player_x, obstacles[i+1]-player_y);
+            double object_distance = hypotenuse(obstacles[i-2]-player_x, obstacles[i-1]-player_y);
             // account for block diagonals being larger (maybe slightly useless)
-            double extra_block_size = abs(block_size*sin(translate_small_rotation(angle)));
+            //double extra_block_size = abs(block_size*sin(translate_small_rotation(angle))); // should be smaller ?
             // adjust angle to be between player_dir and player-->coords
             angle -= player_dir; 
             // get total angle of object in player view
-            double view = get_view(object_distance,block_size+extra_block_size); // TODO: check this actually works
+            //double view = get_view(object_distance,block_size+extra_block_size); // TODO: check this actually works
+            double view = get_view(object_distance,block_size);
             // calculate how many indices of RESOLUTION that is
             int occupied_chunks = ((RESOLUTION * view / PI) / 2) +1; // +1 to err upwards
             // find start obstacle start index in player view
@@ -405,7 +407,7 @@ void look2() {
             // assign colors, check distance to not overwrite closer colors
             while (occupied_chunks>0) {
                 if (object_distance < distance[object_index]) {
-                    colors[object_index] = obstacles[i+2];
+                    colors[object_index] = obstacles[i];
                     distance[object_index] = object_distance;
                 }
                 object_index++;
